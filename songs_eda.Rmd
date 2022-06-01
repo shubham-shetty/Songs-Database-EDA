@@ -1,0 +1,332 @@
+---
+title: "Stat 501 Project"
+subtitle: "EDA on Songs Dataset"
+author: "Kinnri Sinha | Movina Moses | Shanmukh Srinivas | Shubham Shetty | Sruthi Srinivasan"
+output: pdf_document
+date: 'Spring 2022'
+---
+
+# Introduction
+The aim of this project is to perform exploratory data analysis (EDA) on the Million Song Dataset (http://millionsongdataset.com). The Million Song Dataset contains metadata regarding a million popular contemporary English songs released in the 20th and early 21st century. The goal of EDA is to find some interesting trends in the songs dataset which is our basic research question. In this we further analyzing three main topics. First, relation between Artist familiarity and Artist hotness. Second, relation between the artist hotness and the song hotness based on the year of song release. Third, the trends of artist name lengths over the years.
+
+# Data
+We will be performing our analysis on a subset of the Million Song dataset which is provided by official website. This subset consists of 10,000 songs (1\%, 1.8 GB) which are randomly sampled from the larger dataset. Principally, the dataset consists of both metadata and audio analysis features. Each file is for one track which corresponds to one song, one release and one artist. All the information about these four items (track, song, release, artist) are in every file (which involves some redundancy, although the bulk of the data, relating to the audio analysis, is unique).
+
+# Code
+We performed the analysis using R and our code is presented in this report.
+
+# Analysis
+
+## Part 1 - Relationship between Artist Familiarity and Artist Hotness
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r include=FALSE}
+# Don't delete this chunk if you are using the mosaic package
+# This loads the mosaic and dplyr packages
+require(mosaic)
+library(tidyverse)
+library(stringr)
+library(ggplot2)
+library(sf)
+library(mapview)
+```
+
+```{r include=FALSE}
+# Some customization.  You can alter or delete as desired (if you know what you are doing).
+
+# This changes the default colors in lattice plots.
+trellis.par.set(theme=theme.mosaic())  
+
+# knitr settings to control how R chunks work.
+require(knitr)
+opts_chunk$set(
+  tidy=FALSE,     # display code as typed
+  size="small"    # slightly smaller font for code
+)
+# This loads the mosaic data sets.  (Could be deleted if you are not using them.)
+require(mosaicData)   
+```
+
+```{r}
+library(readr)
+music <- read_csv("SongCSV.csv", quote="")
+```
+
+Here, we fit a model predicting Artist Familiarity using Artist Hotness. It has an $R^2$ value of 0.5509 indicating that this could be a fair model to use.
+
+```{r}
+m1 <- lm(ArtistFamiliarity ~ ArtistHotness, data = music)
+summary(m1)
+```
+
+
+### Checking Assumtpiions
+
+```{r}
+xyplot(ArtistFamiliarity ~ ArtistHotness, data=music, type=c("p", "r"))
+```
+
+```{r}
+histogram(~ residuals(m1), nint=10)
+```
+
+```{r}
+xqqmath(~resid(m1))
+```
+
+
+```{r}
+xyplot(residuals(m1) ~ fitted(m1), type=c("p", "r"))
+```
+
+From the above plots, we checked the following assumptions - 
+
+1. Linearity: The linearity assumption is met because the scatter plot does not show any evidence of nonlinearity. It is seen that with an increase in artist familiarity, there is an increase in artist hotness.  
+
+2. Independence: The independence assumption appears to be met because the residuals plot does not show any regular pattern.   
+3. Normal Population: It does appear that the normality assumption is met because in the histogram, we see that the residuals do follow a fairly normal distribution.   
+
+4. Equal Variance: The equal variance assumption appears to be met. The residual graph displays an equal variance among all the data. The residuals look fairly evenly scattered about the horizontal line of 0. But there are a very few values that lie below -0.5, these data values could be contributing the slight left-skewedness.  
+
+### Dropping the Outliers
+
+To see if we would get a better model by dropping the outliers, we experimented by dropping the values with residuals less than -0.5.
+
+```{r}
+m2 <- lm(ArtistFamiliarity ~ ArtistHotness, data=music, subset=resid(m1) < -0.5) 
+summary(m2)
+```
+
+Dropping the residuals resulted in a higher $R^2$ value, indicating that the quality of the model does increase by dropping the residuals.
+
+```{r}
+xyplot(residuals(m2) ~ fitted(m2), type=c("p", "r"))
+```
+
+
+## Part 2 - A study between the artist hotness and the song hotness based on the year of song release
+
+```{r}
+songs_subset <- read.csv("SongCSV - modified.csv", quote = "")
+```
+
+### 1995 - 1999  
+We can see a general increase in Song Hotness with Artist Hotness but the relationship is not significant enough for it to be modeled as a linear relationship.  
+  
+The R-squared value of 20\% further indicates that a linear model is not suitable for modeling this relationship.  
+  
+The error plots reveal constant variance, zero mean and an approximately normal distribution.
+
+```{r}
+ss_95_99 <- subset(songs_subset, (Year <=1999 | Year >= 1995))
+
+xyplot(SongHotness ~ ArtistHotness, data=ss_95_99)
+
+m1_ss_95_99 <- lm(SongHotness ~ ArtistHotness, data = ss_95_99)
+
+summary(m1_ss_95_99)
+
+xyplot(resid(m1_ss_95_99) ~ fitted(m1_ss_95_99), data=ss_95_99, type=c("p", "r"))
+histogram(~residuals(m1_ss_95_99))
+qqmath(~resid(m1_ss_95_99))
+ladd(panel.qqmathline(resid(m1_ss_95_99)))
+```
+
+### 1990 - 1994  
+We do not see a distinctly linear relationship between artist and song hotness. 
+  
+The R-squared value of 15\% further indicates that a linear model is not suitable for modeling this relationship.  
+  
+The error plots reveal constant variance, zero mean and an approximately normal distribution.
+
+```{r}
+ss_90_94 <- subset(songs_subset, (Year <=1994 & Year >= 1990))
+
+xyplot(SongHotness ~ ArtistHotness, data=ss_90_94)
+m1_ss_90_94 <- lm(SongHotness ~ ArtistHotness, data = ss_90_94)
+
+summary(m1_ss_90_94)
+
+xyplot(resid(m1_ss_90_94) ~ fitted(m1_ss_90_94), data=ss_90_94, type=c("p", "r"))
+histogram(~residuals(m1_ss_90_94))
+qqmath(~resid(m1_ss_90_94))
+ladd(panel.qqmathline(resid(m1_ss_90_94)))
+
+```
+
+### 1985 - 1989  
+We do not see a distinctly linear relationship between artist and song hotness. 
+  
+The R-squared value of 15\% further indicates that a linear model is not suitable for modeling this relationship.  
+  
+The error plots reveal constant variance, zero mean, however the curved tails in the normal porbability plot indicates a deviation from the normal distribution.
+
+```{r}
+ss_85_89 <- subset(songs_subset, (Year <=1989 & Year >= 1985))
+xyplot(SongHotness ~ ArtistHotness, data=ss_85_89)
+
+m1_ss_85_89 <- lm(SongHotness ~ ArtistHotness, data = ss_85_89)
+
+summary(m1_ss_85_89)
+
+xyplot(resid(m1_ss_85_89) ~ fitted(m1_ss_85_89), data=ss_85_89, type=c("p", "r"))
+histogram(~residuals(m1_ss_85_89))
+qqmath(~resid(m1_ss_85_89))
+ladd(panel.qqmathline(resid(m1_ss_85_89)))
+
+```
+
+### 1980 - 1984  
+We do not see a distinctly linear relationship between artist and song hotness. 
+  
+The R-squared value of 17\% further indicates that a linear model is not suitable for modeling this relationship.  
+  
+The error plots reveal constant variance, zero mean, however the curved tail on the left in the normal probability plot indicates a deviation from the normal distribution.
+
+```{r}
+ss_80_84 <- subset(songs_subset, (Year <=1984 & Year >= 1980))
+xyplot(SongHotness ~ ArtistHotness, data=ss_80_84)
+m1_ss_80_84 <- lm(SongHotness ~ ArtistHotness, data = ss_80_84)
+
+summary(m1_ss_80_84)
+
+xyplot(resid(m1_ss_80_84) ~ fitted(m1_ss_80_84), data=ss_80_84, type=c("p", "r"))
+histogram(~residuals(m1_ss_80_84))
+qqmath(~resid(m1_ss_80_84))
+ladd(panel.qqmathline(resid(m1_ss_80_84)))
+
+```
+
+### 1975 - 1979  
+We do not see a linear relationship between artist and song hotness. 
+  
+The R-squared value of 3\% further indicates that a linear model is not suitable for modeling this relationship.  
+  
+The error plots reveal constant variance, zero mean, however the curved tails in the normal probability plot indicates a deviation from the normal distribution.
+
+```{r}
+ss_75_79 <- subset(songs_subset, (Year <=1979 & Year >= 1975)) 
+
+xyplot(SongHotness ~ ArtistHotness, data=ss_75_79)
+m1_ss_75_79 <- lm(SongHotness ~ ArtistHotness, data = ss_75_79)
+
+summary(m1_ss_75_79)
+
+xyplot(resid(m1_ss_75_79) ~ fitted(m1_ss_75_79), data=ss_75_79, type=c("p", "r"))
+histogram(~residuals(m1_ss_75_79))
+qqmath(~resid(m1_ss_75_79))
+ladd(panel.qqmathline(resid(m1_ss_75_79)))
+```
+
+### 1970 - 1974
+We see a vague but not significant linear and upward trend between artist and song hotness. 
+  
+The R-squared value of 18\% indicates that a linear model is not suitable for modeling this relationship.  
+  
+The error plots reveal constant variance, zero mean, however the curved tails in the normal probability plot indicates a deviation from the normal distribution.
+
+```{r}
+ss_70_74 <- subset(songs_subset, (Year <=1974 & Year >= 1970))
+
+xyplot(SongHotness ~ ArtistHotness, data=ss_70_74)
+m1_ss_70_74 <- lm(SongHotness ~ ArtistHotness, data = ss_70_74)
+
+summary(m1_ss_70_74)
+
+xyplot(resid(m1_ss_70_74) ~ fitted(m1_ss_70_74), data=ss_70_74, type=c("p", "r"))
+histogram(~residuals(m1_ss_70_74))
+qqmath(~resid(m1_ss_70_74))
+ladd(panel.qqmathline(resid(m1_ss_70_74)))
+
+```
+
+### 1965 - 1969  
+We do not see a distinctly linear relationship between artist and song hotness. 
+  
+The R-squared value of 5\% further indicates that a linear model is not suitable for modeling this relationship.  
+  
+The error plots reveal constant variance, zero mean, however the curved tails in the normal probability plot indicates a deviation from the normal distribution.
+
+```{r}
+ss_65_69 <- subset(songs_subset, (Year <=1969 & Year >= 1965))
+xyplot(SongHotness ~ ArtistHotness, data=ss_65_69)
+
+m1_ss_65_69 <- lm(SongHotness ~ ArtistHotness, data = ss_65_69)
+
+summary(m1_ss_65_69)
+
+xyplot(resid(m1_ss_65_69) ~ fitted(m1_ss_65_69), data=ss_65_69, type=c("p", "r"))
+histogram(~residuals(m1_ss_65_69))
+qqmath(~resid(m1_ss_65_69))
+ladd(panel.qqmathline(resid(m1_ss_65_69)))
+```
+
+### 1960 - 1964  
+We see a positively correlated linear relationship between artist and song hotness. 
+  
+The R-squared value of 26\% further indicates that a linear model could be better in this case than the previous models, but it is still not high enough to for the model to be significant.   
+
+
+```{r}
+ss_60_64 <- subset(songs_subset, (Year <=1964 & Year >= 1960))
+xyplot(SongHotness ~ ArtistHotness, data=ss_60_64)
+
+m1_ss_60_64 <- lm(SongHotness ~ ArtistHotness, data = ss_60_64)
+
+summary(m1_ss_60_64)
+
+xyplot(resid(m1_ss_60_64) ~ fitted(m1_ss_60_64), data=ss_60_64, type=c("p", "r"))
+histogram(~residuals(m1_ss_60_64))
+qqmath(~resid(m1_ss_60_64))
+ladd(panel.qqmathline(resid(m1_ss_60_64)))
+```
+
+## Part 3 - A study to analyse the trends of artist name lengths over the years.
+
+
+To find out the trend, we can first plot the histogram of the release years of the songs to get an idea of the range of years to work with.
+
+```{r}
+hist(music$Year, xlab="Year", main = "Histogram of release years")
+```
+
+From the histogram of years, we see that there are songs that don't have a year associated with it and hence is zero. We can filter those data points out and generate a new histogram.
+
+### 1959 - 1999
+
+```{r}
+msd_59_99 = subset(music, (Year <= 1999& Year >= 1959))
+hist(msd_59_99$Year, xlab="Year", main = "Histogram of release years (1959-1999)")
+```
+
+
+```{r}
+# Creates a new column ArtistNameLength
+msd_59_99$ArtistNameLength = str_length(msd_59_99$ArtistName) 
+
+# Plots the trend from 1959 to 1999
+ggplot(msd_59_99, aes(x = Year, y = ArtistNameLength)) + 
+  ggtitle("Trend of Artist name lengths (1959 to 1999)") +
+  xlab("Year") + ylab("Artist Name Length")+
+  stat_summary_bin(fun='mean', geom = "line")
+```
+
+From the plot we can see various trends in the length of the Artist names. It seems to have reached an
+all time high in the mid-1960's and except for a few years in mid 1970's. After the mid 1970's there was a sharp decrease in the length, after which the average name length has stayed 15-16 characters till 2000.\
+\
+
+This state of constancy is kind of counter-intuitive since we might expect the names to get longer because of a shortage of unique shorter names.\
+
+
+# Conclusion
+Our basic research question was to analyse the trends in the Million Song DataSet. 
+
+In this we first analysed the relation between Artist familiarity and Artist hotness. We can see that with the increase in Artist familiarity there is an increase in the artist hotness and we can hence say that it is easy to model the artist familiarity to predict the artist hotness. 
+We also found that the residuals follow a normal distribution.
+
+Second, we analysed the relation between artist hotness and the song hotness based on the year in the year in which the song was released. In general there was increase in Song Hotness with Artist Hotness. This primarily seen between the years 1960 and 1964. Later, it wasn't very distinctly visible. 
+
+Third, we analysed the trends of artist name lengths over the years.We see that the Artist name length peaked in the mid-1960's, after which there was a sharp decrease in the name length and the name length has remained 15-16 characters till 2000s. 
+
